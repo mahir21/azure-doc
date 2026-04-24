@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Date Extractor MVP</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #f7f7fb; color: #111; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    .card { background: white; padding: 20px; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.06); margin-bottom: 20px; }
+    h1 { margin-top: 0; }
+    button { background: #111; color: white; border: 0; padding: 10px 14px; border-radius: 10px; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    input[type=file] { margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; background: white; }
+    th, td { border-bottom: 1px solid #eee; text-align: left; padding: 10px; vertical-align: top; }
+    th { background: #fafafa; position: sticky; top: 0; }
+    .tag { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #eef2ff; font-size: 12px; }
+    .muted { color: #666; font-size: 13px; }
+    .status { margin-top: 10px; white-space: pre-wrap; }
+    .row-actions { display: flex; gap: 8px; align-items: center; }
+    .small { font-size: 12px; color: #666; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .snippet { max-width: 360px; white-space: normal; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Bulk Date Extractor MVP</h1>
+      <div class="muted">Upload scanned PDFs or images. The app uses Azure OCR, finds likely dates, labels them, and exports selected items to a calendar file.</div>
+      <input id="files" type="file" multiple />
+      <div class="controls">
+        <button onclick="extract()">Extract Dates</button>
+        <button onclick="selectAll()">Select All</button>
+        <button onclick="clearAll()">Clear All</button>
+        <button onclick="downloadICS()">Download .ics</button>
+      </div>
+      <div id="status" class="status muted"></div>
+    </div>
+
+    <div class="card">
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th>Select</th>
+            <th>File</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Confidence</th>
+            <th>Snippet</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+          <tr><td colspan="7" class="muted">No results yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+let results = [];
+
+function renderTable() {
+  const body = document.getElementById("resultsBody");
+  body.innerHTML = "";
+
+  if (!results.length) {
+    body.innerHTML = '<tr><td colspan="7" class="muted">No results yet.</td></tr>';
+    return;
+  }
+
+  results.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input type="checkbox" data-index="${i}" ${row.selected ? "checked" : ""} onchange="toggleRow(${i}, this.checked)"></td>
+      <td>${escapeHtml(row.filename)}</td>
+      <td><span class="tag">${escapeHtml(row.event_type)}</span></td>
+      <td><input value="${escapeHtml(row.event_date || "")}" onchange="updateField(${i}, 'event_date', this.value)" /></td>
+      <td><input value="${escapeHtml(row.event_time || "")}" onchange="updateField(${i}, 'event_time', this.value)" /></td>
+      <td>${escapeHtml(row.confidence)}</td>
+      <td class="snippet">${escapeHtml(row.snippet || "")}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function toggleRow(i, checked) {
+  results[i].selected = checked;
+}
+
+function updateField(i, field, value) {
+  results[i][field] = value;
+}
+
+function selectAll() {
+  results = results.map(r => ({...r, selected: true}));
+  renderTable();
+}
+
+function clearAll() {
+  results = results.map(r => ({...r, selected: false}));
+  renderTable();
+}
+
+async function extract() {
+  const status = document.getElementById("status");
+  const fileInput = document.getElementById("files");
+
+  if (!fileInput.files.length) {
+    status.textContent = "Choose at least one file.";
+    return;
+  }
+
+  const fd = new FormData();
+  for (const f of fileInput.files) {
+    fd.append("files", f);
+  }
+
+  status.textContent = "Processing files... this can take a little bit for scanned PDFs.";
+
+  try {
+    const res = await fetch("/extract", {
+      method: "POST",
+      body: fd
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      status.textContent = data.detail || "Extraction failed.";
+      return;
+    }
+
+    results = data.results.map(r => ({...r, selected: true}));
+    renderTable();
+    status.textContent = `Done. Found ${results.length} candidate event(s).`;
+  } catch (err) {
+    status.textContent = "Request failed: " + err;
+  }
+}
+
+async function downloadICS() {
+  const selected = results.filter(r => r.selected);
+
+  if (!selected.length) {
+    document.getElementById("status").textContent = "Select at least one row first.";
+    return;
+  }
+
+  const res = await fetch("/download-ics", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(selected)
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    document.getElementById("status").textContent = data.detail || "ICS export failed.";
+    return;
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "calendar_events.ics";
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
