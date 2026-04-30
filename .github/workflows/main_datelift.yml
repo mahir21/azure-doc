@@ -2,7 +2,7 @@
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 # More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
 
-name: Build and deploy Python app to Azure Web App - DateLift
+name: Build and deploy Python app to Azure Web App - Datelift
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python version
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.11'
 
       # 🛠️ Local Build Section (Optional)
       # The following section in your workflow is designed to catch build issues early on the client side, before deployment. This can be helpful for debugging and validation. However, if this step significantly increases deployment time and early detection is not critical for your workflow, you may remove this section to streamline the deployment process.
@@ -63,14 +63,14 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AE8438D9D9844CF28EF0941AD66415B0 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_6146777251534B799341926E8CB51258 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_752C9C28233141AF8D5804CC96CB1CE4 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_D9F1787DDE944C50942E3770B84B749A }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_55F75C355E7B4D278FB292EF07B87C0A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_43DB27ED5E0647119CEEE585EA7A34D3 }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'DateLift'
+          app-name: 'Datelift'
           slot-name: 'Production'
           
