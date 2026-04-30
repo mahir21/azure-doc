@@ -2,6 +2,7 @@ import os
 import re
 import json
 import tempfile
+import uvicorn
 from datetime import datetime
 from typing import List, Dict, Any
 
