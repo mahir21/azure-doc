@@ -1,6 +1,9 @@
 fastapi
 uvicorn
-python-multipart
+gunicorn
 httpx
+azure-storage-blob
+python-dateutil
 dateparser
 ics
+python-multipart
