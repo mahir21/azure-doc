@@ -3,6 +3,9 @@ from pathlib import Path
 
 
 def load_env_file() -> None:
+    if os.getenv("WEBSITE_SITE_NAME"):
+        return
+
     env_path = Path(__file__).resolve().parents[2] / ".env"
     if not env_path.exists():
         return
@@ -13,7 +16,7 @@ def load_env_file() -> None:
             continue
 
         key, value = line.split("=", 1)
-        os.environ[key.strip()] = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 load_env_file()
